@@ -4,6 +4,7 @@ import { Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ReactiveFormsModule } from "@angular/forms";
 import { TripData } from '../services/trip-data';
 import { Trip } from '../models/trip';
+import { Authentication } from '../services/authentication';
 
 @Component({
   selector: 'app-edit-trip',
@@ -12,7 +13,7 @@ import { Trip } from '../models/trip';
   templateUrl: './edit-trip.html',
   styleUrl: './edit-trip.css'
 })
-export class EditTripComponent implements OnInit {
+export class EditTrip implements OnInit {
   public editForm!: FormGroup;
   trip!: Trip;
   submitted = false;
@@ -21,20 +22,24 @@ export class EditTripComponent implements OnInit {
   constructor(
     private formBuilder: FormBuilder,
     private router: Router,
-    private tripData: TripData
+    private tripData: TripData,
+    private authentication: Authentication
   ) { }
 
   ngOnInit(): void {
+    // Redirect if not logged in
+    if (!this.authentication.isLoggedIn()) {
+      this.router.navigate(['login']);
+      return;
+    }
+
     // Retrieve stashed trip ID
-    let tripCode = localStorage.getItem("tripCode");
+    const tripCode = localStorage.getItem("tripCode");
     if (!tripCode) {
       alert("Something wrong, couldn't find where I stashed tripCode!");
       this.router.navigate(['']);
       return;
     }
-
-    console.log('EditTrip::ngOnInit');
-    console.log('tripcode:' + tripCode);
 
     this.editForm = this.formBuilder.group({
       _id: [],
@@ -48,38 +53,51 @@ export class EditTripComponent implements OnInit {
       description: ['', Validators.required]
     });
 
-    this.tripData.getTrip(tripCode)
-      .subscribe({
-        next: (value: any) => {
-          this.trip = value;
-          // Populate our record into the form
-          this.editForm.patchValue(value[0]);
-          if (!value) {
-            this.message = 'No Trip Retrieved!';
-          } else {
-            this.message = 'Trip: ' + tripCode + ' retrieved';
+    this.tripData.getTrip(tripCode).subscribe({
+      next: (value: any) => {
+        // API returns an array; take first item
+        const record = Array.isArray(value) ? value[0] : value;
+        if (record) {
+          // If start is a Date, make it an ISO yyyy-MM-dd string for <input type="date">
+          const patch = { ...record };
+          if (patch.start) {
+            const d = new Date(patch.start);
+            // If template uses <input type="date">, use yyyy-MM-dd. If plain text, skip.
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            patch.start = `${yyyy}-${mm}-${dd}`;
           }
-          console.log(this.message);
-        },
-        error: (error: any) => {
-          console.log('Error: ' + error);
+          this.trip = record;
+          this.editForm.patchValue(patch);
+          this.message = `Trip: ${tripCode} retrieved`;
+        } else {
+          this.message = 'No Trip Retrieved!';
         }
-      });
+        console.log(this.message);
+      },
+      error: (error: any) => {
+        console.log('Error: ' + error);
+      }
+    });
   }
 
   public onSubmit() {
     this.submitted = true;
     if (this.editForm.valid) {
-      this.tripData.updateTrip(this.editForm.value)
-        .subscribe({
-          next: (value: any) => {
-            console.log(value);
-            this.router.navigate(['']);
-          },
-          error: (error: any) => {
-            console.log('Error: ' + error);
-          }
-        });
+      const payload = { ...this.editForm.value };
+      if (payload.start) {
+        payload.start = new Date(payload.start);
+      }
+      this.tripData.updateTrip(payload).subscribe({
+        next: (value: any) => {
+          console.log(value);
+          this.router.navigate(['']);
+        },
+        error: (error: any) => {
+          console.log('Error: ' + error);
+        }
+      });
     }
   }
 

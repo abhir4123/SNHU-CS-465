@@ -1,101 +1,55 @@
-const mongoose = require('mongoose');
-const Trip = require('../models/travlr'); // Register model
-const Model = mongoose.model('trips');
+const Trip = require('../models/travlr');
 
-// GET: /trips - lists all the trips
-// Regardless of outcome, response must include HTML status code
-// and JSON message to the requesting client
+// GET: /trips
 const tripsList = async (req, res) => {
-    const q = await Model
-        .find({}) // No filter, return all records
-        .exec();
-
-    // Uncomment the following line to show results of query
-    // on the console
-    // console.log(q);
-
-    if (!q) {
-        // Database returned no data
-        return res
-            .status(404)
-            .json({ "message": "No trips found" });
-    } else {
-        // Return resulting trip list
-        return res
-            .status(200)
-            .json(q);
+    try {
+        const docs = await Trip.find({}).exec();
+        if (!docs || docs.length === 0) {
+            return res.status(404).json({ message: 'No trips found' });
+        }
+        return res.status(200).json(docs);
+    } catch (err) {
+        return res.status(500).json({ message: 'DB error', error: err.message });
     }
 };
 
-// GET: /trips/:tripCode - lists a single trip
-// Regardless of outcome, response must include HTML status code
-// and JSON message to the requesting client
+// GET: /trips/:tripCode
 const tripsFindByCode = async (req, res) => {
-    const q = await Model
-        .find({ 'code': req.params.tripCode }) // Return single record
-        .exec();
-
-    // Uncomment the following line to show results of query
-    // on the console
-    // console.log(q);
-
-    if (!q) {
-        // Database returned no data
-        return res
-            .status(404)
-            .json({ "message": "Trip not found" });
-    } else {
-        // Return resulting trip list
-        return res
-            .status(200)
-            .json(q);
+    try {
+        const doc = await Trip.findOne({ code: req.params.tripCode }).exec();
+        if (!doc) {
+            return res.status(404).json({ message: 'Trip not found' });
+        }
+        return res.status(200).json(doc);
+    } catch (err) {
+        return res.status(500).json({ message: 'DB error', error: err.message });
     }
 };
 
-// POST: /trips - Adds a new Trip
-// Regardless of outcome, response must include HTML status code
-// and JSON message to the requesting client
+// POST: /trips
 const tripsAddTrip = async (req, res) => {
-    const newTrip = new Trip({
-        code: req.body.code,
-        name: req.body.name,
-        length: req.body.length,
-        start: req.body.start,
-        resort: req.body.resort,
-        perPerson: req.body.perPerson,
-        image: req.body.image,
-        description: req.body.description
-    });
-
-    const q = await newTrip.save();
-
-    if (!q) {
-        // Database returned no data
-        return res
-            .status(400)
-            .json(err);
-    } else {
-        // Return new trip
-        return res
-            .status(201)
-            .json(q);
+    try {
+        const created = await Trip.create({
+            code: req.body.code,
+            name: req.body.name,
+            length: req.body.length,
+            start: req.body.start,
+            resort: req.body.resort,
+            perPerson: req.body.perPerson,
+            image: req.body.image,
+            description: req.body.description
+        });
+        return res.status(201).json(created);
+    } catch (err) {
+        return res.status(400).json({ message: 'Create failed', error: err.message });
     }
-
-    // Uncomment the following line to show results of operation
-    // on the console
-    // console.log(q);
 };
 
-// PUT: /trips/:tripCode - Adds a new Trip
-// Regardless of outcome, response must include HTML status code
-// and JSON message to the requesting client
+// PUT: /trips/:tripCode
 const tripsUpdateTrip = async (req, res) => {
-    // Uncomment for debugging
-    console.log(req.params);
-    console.log(req.body);
-    const q = await Model
-        .findOneAndUpdate(
-            { 'code': req.params.tripCode },
+    try {
+        const updated = await Trip.findOneAndUpdate(
+            { code: req.params.tripCode },
             {
                 code: req.body.code,
                 name: req.body.name,
@@ -105,45 +59,27 @@ const tripsUpdateTrip = async (req, res) => {
                 perPerson: req.body.perPerson,
                 image: req.body.image,
                 description: req.body.description
-            }
-        )
-        .exec();
-    if (!q) { // Database returned no data
-        return res
-            .status(400)
-            .json(err);
-    } else { // Return resulting updated trip
-        return res
-            .status(201)
-            .json(q);
+            },
+            { new: true, runValidators: true }
+        ).exec();
+
+        if (!updated) return res.status(404).json({ message: 'Trip not found' });
+        return res.status(200).json(updated);
+    } catch (err) {
+        return res.status(400).json({ message: 'Update failed', error: err.message });
     }
-    // Uncomment the following line to show results of operation
-    // on the console
-    // console.log(q);
 };
 
-// DELETE: /trips/:tripCode - Deletes a Trip
-// Regardless of outcome, response must include HTML status code
-// and JSON message to the requesting client
+// DELETE: /trips/:tripCode
 const tripsDeleteTrip = async (req, res) => {
-    const q = await Model
-        .findOneAndDelete({ 'code': req.params.tripCode })
-        .exec();
-
-    if (!q) {
-        // No matching trip found to delete
-        return res
-            .status(404)
-            .json({ "message": "Trip not found" });
-    } else {
-        // Deleted successfully; no body needed
-        return res
-            .status(204)
-            .send();
+    try {
+        const deleted = await Trip.findOneAndDelete({ code: req.params.tripCode }).exec();
+        if (!deleted) return res.status(404).json({ message: 'Trip not found' });
+        return res.status(204).send();
+    } catch (err) {
+        return res.status(500).json({ message: 'Delete failed', error: err.message });
     }
 };
-
-
 
 module.exports = {
     tripsList,
